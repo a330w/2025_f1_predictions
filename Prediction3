@@ -1,0 +1,135 @@
+import fastf1
+import pandas as pd
+import numpy as np
+import requests
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_absolute_error
+
+# Enable FastF1 caching
+fastf1.Cache.enable_cache("f1_cache")
+
+# Load 2024 Japanese GP race session
+session_2024 = fastf1.get_session(2024, "Japan", "R")
+session_2024.load()
+
+# Extract lap and sector times
+laps_2024 = session_2024.laps[["Driver", "LapTime", "Sector1Time", "Sector2Time", "Sector3Time"]].copy()
+laps_2024.dropna(inplace=True)
+
+# Convert times to seconds
+for col in ["LapTime", "Sector1Time", "Sector2Time", "Sector3Time"]:
+    laps_2024[f"{col} (s)"] = laps_2024[col].dt.total_seconds()
+
+# Group by driver to get average sector times per driver
+sector_times_2024 = laps_2024.groupby("Driver")[["Sector1Time (s)", "Sector2Time (s)", "Sector3Time (s)"]].mean().reset_index()
+
+# 2025 Qualifying Data (Keeping Only 2024 Drivers)
+qualifying_2025 = pd.DataFrame({
+    "Driver": ["Oscar Piastri", "George Russell", "Lando Norris", "Max Verstappen", "Lewis Hamilton",
+               "Charles Leclerc", "Yuki Tsunoda", "Esteban Ocon", "Nico Hülkenberg",
+               "Fernando Alonso", "Lance Stroll", "Carlos Sainz Jr.", "Pierre Gasly"],
+    "QualifyingTime (s)": [87.027, 87.318, 86.995, 86.983, 87.610,
+                           87.299, 88.000, 88.696, 88.570,
+                           87.897, 89.271, 87.836, 87.822]
+})
+
+# Map full names to FastF1 3-letter codes
+driver_mapping = {
+    "Oscar Piastri": "PIA", "George Russell": "RUS", "Lando Norris": "NOR", "Max Verstappen": "VER",
+    "Lewis Hamilton": "HAM", "Charles Leclerc": "LEC", "Yuki Tsunoda": "TSU",
+    "Esteban Ocon": "OCO", "Nico Hülkenberg": "HUL", "Fernando Alonso": "ALO", "Lance Stroll": "STR",
+    "Carlos Sainz Jr.": "SAI", "Pierre Gasly": "GAS"
+}
+
+qualifying_2025["DriverCode"] = qualifying_2025["Driver"].map(driver_mapping)
+
+#
+print (sector_times_2024)
+print(qualifying_2025)
+
+# Merge qualifying data with sector times
+merged_data = qualifying_2025.merge(sector_times_2024, left_on="DriverCode", right_on="Driver", how="left")
+
+#
+print(merged_data)
+
+#Driver-Specific Wet Performance based on 22-23 Canadian GP
+driver_wet_performance = {
+    "Max Verstappen": 0.975196, 
+    "Lewis Hamilton": 0.976464, 
+    "Charles Leclerc": 0.975862,
+    "George Russell": 0.968678,
+    "Lando Norris": 0.978179,
+    "Yuki Tsunoda": 0.996338,
+    "Esteban Ocon": 0.98181,
+    "Fernando Alonso": 0.972655, 
+    "Lance Stroll": 0.979857,
+    "Carlos Sainz Jr.": 0.978754, 
+    "Pierre Gasly": 0.978832
+    }
+
+# Apply wet performance scores to qualifying times
+#merged_data.rename(columns={"Driver_x": "Driver"}, inplace=True)
+#print("Line 68 is running smoothly")
+merged_data["WetPerformanceFactor"] = merged_data["Driver_x"].map(driver_wet_performance)
+#
+print(merged_data)
+
+#Forecasted weather data for Suzuka using OpenWeatherMap API
+API_KEY = "1bee8a6e63d82fd244d5ad4d3b7a81ea" #Replace with your OpenWeatherMap API key
+weather_url = f"http://api.openweathermap.org/data/2.5/forecast?q=Suzuka&appid={API_KEY}&units=metric"
+
+# Fetch weather data
+response = requests.get(weather_url)
+weather_data = response.json()
+
+#Extract the relevant weather data for the race (Sunday, 1400 hrs Local time)
+forecast_time = "2025-03-30 14:00:00"
+forecast_data = None
+for forecast in weather_data["list"]:
+    if forecast["dt_txt"] == forecast_time:
+        forecast_data = forecast
+        break
+
+#Extract the weather features(Rain probability, temperature)
+if forecast_data:
+    rain_probability = forecast_data["pop"]  # Rain Probability (0-1 scale)
+    temperature = forecast_data["main"]["temp"]  # Temperature in Celsius
+else:
+    rain_probability = 0 # Default if no data is found
+    temperature = 20  # Assume Avg Temperature
+
+# Create weather features for the model
+merged_data["RainProbability"] = rain_probability
+merged_data["Temperature"] = temperature
+
+
+# Define feature set (Qualifying + Sector Times + Weather + Wet Performance Factor)
+X = merged_data[["QualifyingTime (s)", "Sector1Time (s)", "Sector2Time (s)", "Sector3Time (s)", "WetPerformanceFactor", "RainProbability", "Temperature"]].fillna(0)
+
+#Use Average Lap Time as target variable
+y = merged_data.merge(laps_2024.groupby("Driver")["LapTime (s)"].mean(), left_on="DriverCode", right_index=True)["LapTime (s)"]
+print(y)
+print(X)
+
+
+# Train Gradient Boosting Model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=38)
+model = GradientBoostingRegressor(n_estimators=200, learning_rate=0.1, random_state=38)
+model.fit(X_train, y_train)
+
+# Predict race times using 2025 qualifying and sector data
+predicted_race_times = model.predict(X)
+qualifying_2025["PredictedRaceTime (s)"] = predicted_race_times
+
+# Rank drivers by predicted race time
+qualifying_2025 = qualifying_2025.sort_values(by="PredictedRaceTime (s)")
+
+# Print final predictions
+print("\n🏁 Predicted 2025 Japanese GP Winner (Just the Old Drivers, No New Drivers)🏁\n")
+print(qualifying_2025[["Driver", "PredictedRaceTime (s)"]])
+
+# Evaluate Model
+y_pred = model.predict(X_test)
+print(f"\n🔍 Model Error (MAE): {mean_absolute_error(y_test, y_pred):.2f} seconds")

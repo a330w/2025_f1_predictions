@@ -41,10 +41,10 @@ python3 prediction1.py
 ```
 Expected output:
 ```
-🏁 Predicted 2025 Australian GP Winner 🏁
-Driver: Charles Leclerc, Predicted Race Time: 82.67s
+🏁 Predicted 2025 Japanese GP Winner (Just the Old Drivers, No New Drivers)🏁
+Driver: Max Verstappen, Predicted Race Time: 96.97s
 ...
-🔍 Model Error (MAE): 3.22 seconds
+🔍 Model Error (MAE): 0.39 seconds
 ```
 
 ## 📈 Model Performance
@@ -54,11 +54,20 @@ The Mean Absolute Error (MAE) is used to evaluate how well the model predicts ra
 - Incorporate **weather conditions** as a feature
 - Add **pit stop strategies** into the model
 - Explore **deep learning** models for improved accuracy
-- @mar_antaya on Instagram and TikTok will update with the latest predictions before every race of the 2025 F1 season
+
+## Features that can be added
+Constructor Performance
+Weather: Track temperature, Probability of rain
+Pit stop data: Number of Pitstops and avg time lost
+Driver consistency: Std. deviation of lap times
+Tyre compound
+Chances of safety car in the race
+
+## Prediction upgrades
+Pitstop Strategy: Historical data of # of Pitstops, compound used
+
+## Analytics
+Display driver data etc etc like box box app but a desktop thing
 
 ## 📜 License
 This project is licensed under the MIT License.
-
-
-🏎️ **Start predicting F1 races like a data scientist!** 🚀
-
