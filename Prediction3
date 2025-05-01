@@ -77,7 +77,7 @@ merged_data["WetPerformanceFactor"] = merged_data["Driver_x"].map(driver_wet_per
 print(merged_data)
 
 #Forecasted weather data for Suzuka using OpenWeatherMap API
-API_KEY = "1bee8a6e63d82fd244d5ad4d3b7a81ea" #Replace with your OpenWeatherMap API key
+API_KEY = "API KEY" #Replace with your OpenWeatherMap API key
 weather_url = f"http://api.openweathermap.org/data/2.5/forecast?q=Suzuka&appid={API_KEY}&units=metric"
 
 # Fetch weather data
