@@ -1,0 +1,11 @@
+# 2025 F1 Predictions - Project Dependencies
+# Python 3.11.14+
+# Last updated: 2025-12-18
+
+# Core dependencies
+fastf1==3.7.0        # F1 race data and telemetry
+pandas==2.3.3        # Data manipulation and analysis
+scikit-learn==1.8.0  # Machine learning models
+
+# Note: numpy is installed as a transitive dependency of pandas and scikit-learn
+# No need to specify it explicitly unless used directly in code
